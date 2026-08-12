@@ -174,46 +174,71 @@ aside.side { display: none; }
 /* briefs */
 section.brief { padding: 40px 0 6px; }
 section.brief + section.brief { border-top: 1px solid var(--line); }
-.brief .kick {
+h2.kick {
   display: flex; align-items: center; gap: 12px; margin: 0 0 6px;
 }
-.brief .kick .k {
+h2.kick .k {
   font-family: var(--mono); font-size: 12px; font-weight: 700;
   letter-spacing: 0.22em; text-transform: uppercase;
 }
-.brief .kick .wc { font-family: var(--mono); font-size: 11px; color: var(--ink-mute); letter-spacing: 0.06em; }
+h2.kick .wc { font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--ink-mute); letter-spacing: 0.06em; }
 .brief .rule { height: 1px; margin: 0 0 20px; opacity: 0.45; }
 
-.brief.exec .kick .k { color: var(--exec-t); } .brief.exec .rule { background: var(--exec); }
-.brief.prac .kick .k { color: var(--prac-t); } .brief.prac .rule { background: var(--prac); }
-.brief.stack .kick .k { color: var(--stack-t); } .brief.stack .rule { background: var(--stack); }
-.brief.mkts .kick .k { color: var(--mkts-t); } .brief.mkts .rule { background: var(--mkts); }
-.brief.land .kick .k { color: var(--land-t); } .brief.land .rule { background: var(--land); }
+.brief.exec h2.kick .k { color: var(--exec-t); } .brief.exec .rule { background: var(--exec); }
+.brief.prac h2.kick .k { color: var(--prac-t); } .brief.prac .rule { background: var(--prac); }
+.brief.stack h2.kick .k { color: var(--stack-t); } .brief.stack .rule { background: var(--stack); }
+.brief.mkts h2.kick .k { color: var(--mkts-t); } .brief.mkts .rule { background: var(--mkts); }
+.brief.land h2.kick .k { color: var(--land-t); } .brief.land .rule { background: var(--land); }
 
-.brief h2 {
+.brief h3 {
   font-family: var(--sans); font-weight: 700; font-size: 25px;
   letter-spacing: -0.005em; line-height: 1.2; color: var(--ink-bright);
   margin: 40px 0 14px; scroll-margin-top: 80px; position: relative;
+  text-wrap: balance;
 }
-.brief h2 .anch {
+.brief .rule + h3 { margin-top: 20px; }
+.brief h3 .anch {
   position: absolute; left: -26px; opacity: 0; text-decoration: none;
   color: var(--ink-mute); font-family: var(--mono); font-weight: 400;
 }
-.brief h2:hover .anch { opacity: 1; }
-.brief h3 { font-family: var(--sans); font-weight: 700; font-size: 18px; color: var(--ink-bright); margin: 26px 0 8px; scroll-margin-top: 80px; }
-.brief p { margin: 0 0 18px; }
+.brief h3:hover .anch { opacity: 1; }
+.brief h4 { font-family: var(--sans); font-weight: 700; font-size: 18px; color: var(--ink-bright); margin: 26px 0 8px; scroll-margin-top: 80px; }
+.brief p { margin: 0 0 18px; text-wrap: pretty; }
 .brief b, .brief strong { font-family: var(--sans); font-weight: 700; color: var(--ink-bright); letter-spacing: 0; }
-.brief ul { margin: 0 0 20px; padding: 0; list-style: none; }
-.brief li { padding: 9px 0 9px 22px; position: relative; }
-.brief li::before {
-  content: ""; position: absolute; left: 0; top: 19px;
+.brief ul, .brief ol { margin: 0 0 20px; padding: 0; list-style: none; }
+.brief li { padding: 10px 0 10px 24px; position: relative; text-wrap: pretty; }
+.brief li + li { border-top: 1px solid rgba(255,255,255,0.05); }
+.brief ul li::before {
+  content: ""; position: absolute; left: 0; top: 20px;
   width: 7px; height: 7px; background: var(--ink-mute);
 }
-.brief.exec li::before { background: var(--exec); }
-.brief.prac li::before { background: var(--prac); }
-.brief.stack li::before { background: var(--stack); }
-.brief.mkts li::before { background: var(--mkts); }
-.brief.land li::before { background: var(--land); }
+.brief ol { counter-reset: item; }
+.brief ol li { counter-increment: item; padding-left: 30px; }
+.brief ol li::before {
+  content: counter(item); position: absolute; left: 0; top: 11px;
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  color: var(--ink-mute);
+}
+.brief.exec ul li::before { background: var(--exec); }
+.brief.prac ul li::before { background: var(--prac); }
+.brief.stack ul li::before { background: var(--stack); }
+.brief.mkts ul li::before { background: var(--mkts); }
+.brief.land ul li::before { background: var(--land); }
+.brief.exec ol li::before { color: var(--exec-t); }
+.brief.prac ol li::before { color: var(--prac-t); }
+.brief.stack ol li::before { color: var(--stack-t); }
+.brief.mkts ol li::before { color: var(--mkts-t); }
+.brief.land ol li::before { color: var(--land-t); }
+.brief blockquote {
+  margin: 0 0 20px; padding: 4px 0 4px 20px;
+  border-left: 2px solid var(--ink-mute);
+  font-style: italic; color: var(--ink);
+}
+.brief.exec blockquote { border-color: var(--exec); }
+.brief.prac blockquote { border-color: var(--prac); }
+.brief.stack blockquote { border-color: var(--stack); }
+.brief.mkts blockquote { border-color: var(--mkts); }
+.brief.land blockquote { border-color: var(--land); }
 .brief code {
   font-family: var(--mono); font-size: 15px;
   background: var(--bg-2); padding: 1px 6px; border: 1px solid var(--line);
@@ -303,10 +328,24 @@ footer.foot { border-top: 1px solid var(--line); margin-top: 44px; padding: 30px
 .arch-list .dots i { width: 6px; height: 6px; display: inline-block; }
 .arch-list .n { font-family: var(--mono); font-size: 11px; color: var(--ink-mute); letter-spacing: 0.08em; text-transform: uppercase; }
 
+/* house slot / sponsor */
+.slot {
+  margin: 44px 0 0; padding: 22px 26px;
+  border: 1px solid var(--line); background: var(--bg-2);
+}
+.slot .k {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute);
+  margin: 0 0 8px;
+}
+.slot p { font-family: var(--sans); font-size: 15px; color: var(--ink); margin: 0; line-height: 1.55; }
+.slot a { color: var(--ink-bright); text-decoration-color: var(--orange); }
+
 @media (max-width: 560px) {
   body { font-size: 18px; }
   .issue-head { padding: 34px 0 6px; }
   .toc { padding: 18px 18px 12px; }
-  .brief h2 .anch { display: none; }
+  .brief h3 .anch { display: none; }
+  .brief p, .brief li { hyphens: auto; }
   .arch-list .dots { display: none; }
 }

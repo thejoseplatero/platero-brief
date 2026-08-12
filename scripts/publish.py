@@ -115,8 +115,15 @@ def md_inline(s: str) -> str:
 
 
 def md_to_html(md: str, anchor_prefix: str):
-    """Returns (html, [(anchor_id, heading_text)], word_count)."""
-    out, para, in_list, heads = [], [], False, []
+    """Returns (html, [(anchor_id, heading_text)], word_count).
+
+    Issue pages use h1 for the date and h2 for the brief names, so the
+    source's ## headings render as h3 and ### as h4: one clean hierarchy
+    for readers and crawlers alike.
+    """
+    out, para, heads = [], [], []
+    list_tag = None  # None | "ul" | "ol"
+    quote = []
     words = len(re.findall(r"\S+", md))
 
     def flush_para():
@@ -126,35 +133,67 @@ def md_to_html(md: str, anchor_prefix: str):
             para = []
 
     def close_list():
-        nonlocal in_list
-        if in_list:
-            out.append("</ul>")
-            in_list = False
+        nonlocal list_tag
+        if list_tag:
+            out.append(f"</{list_tag}>")
+            list_tag = None
+
+    def flush_quote():
+        nonlocal quote
+        if quote:
+            out.append("<blockquote><p>" + md_inline(" ".join(quote)) + "</p></blockquote>")
+            quote = []
+
+    def open_list(tag):
+        nonlocal list_tag
+        if list_tag != tag:
+            close_list()
+            out.append(f"<{tag}>")
+            list_tag = tag
 
     for raw in md.split("\n"):
         stripped = raw.strip()
         if not stripped:
-            flush_para(); close_list()
+            flush_para(); close_list(); flush_quote()
             continue
+        if stripped.startswith("> "):
+            flush_para(); close_list()
+            quote.append(stripped[2:])
+            continue
+        flush_quote()
         if stripped.startswith("### "):
             flush_para(); close_list()
-            out.append("<h3>" + md_inline(stripped[4:]) + "</h3>")
+            out.append("<h4>" + md_inline(stripped[4:]) + "</h4>")
         elif stripped.startswith("## "):
             flush_para(); close_list()
             title = stripped[3:].strip()
             aid = f"{anchor_prefix}-{slugify(title)}"
             heads.append((aid, title))
-            out.append(f'<h2 id="{aid}"><a class="anch" href="#{aid}" aria-label="Link to this section">#</a>'
-                       + md_inline(title) + "</h2>")
+            out.append(f'<h3 id="{aid}"><a class="anch" href="#{aid}" aria-label="Link to this section">#</a>'
+                       + md_inline(title) + "</h3>")
         elif stripped.startswith(("- ", "* ")):
-            flush_para()
-            if not in_list:
-                out.append("<ul>"); in_list = True
+            flush_para(); open_list("ul")
             out.append("<li>" + md_inline(stripped[2:]) + "</li>")
+        elif re.match(r"\d+\.\s", stripped):
+            flush_para(); open_list("ol")
+            out.append("<li>" + md_inline(re.sub(r"^\d+\.\s+", "", stripped)) + "</li>")
         else:
             para.append(stripped)
-    flush_para(); close_list()
+    flush_para(); close_list(); flush_quote()
     return "\n".join(out), heads, words
+
+
+def plain_excerpt(md: str, limit: int = 155) -> str:
+    """First real sentence(s) of a brief as plain text, for meta descriptions."""
+    text = re.sub(r"^#{1,4}\s+[^\n]+$", "", md, flags=re.MULTILINE)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"^[-*>]\s+", "", text, flags=re.MULTILINE)
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    return cut[:cut.rfind(" ")].rstrip(".,;:") + "..."
 
 
 class Brief:
@@ -162,6 +201,7 @@ class Brief:
         self.slug, self.name, self.css = slug, name, css
         self.html, self.heads, self.words = md_to_html(body_md, css)
         self.minutes = max(1, round(self.words / WPM))
+        self.excerpt = plain_excerpt(body_md)
 
 
 def load_day(day: str):
@@ -194,18 +234,64 @@ def human_date(day: str) -> str:
     return datetime.strptime(day, "%Y-%m-%d").strftime("%A, %B %-d, %Y")
 
 
-def head_block(title: str, desc: str, canonical: str, css_prefix: str) -> str:
+def head_block(title: str, desc: str, canonical: str, css_prefix: str,
+               og_type: str = "article", jsonld: str = "", pub_date: str = "") -> str:
+    article_meta = (f'\n<meta property="article:published_time" content="{pub_date}T08:00:00-04:00">'
+                    if pub_date else "")
     return f"""<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="{html.escape(desc, quote=True)}">
+<meta name="author" content="Jose Platero">
 <title>{html.escape(title)}</title>
 <link rel="canonical" href="{canonical}">
 <link rel="alternate" type="application/rss+xml" title="The Platero Brief" href="{BASE}feed.xml">
-<meta property="og:type" content="article">
+<meta property="og:type" content="{og_type}">
+<meta property="og:site_name" content="The Platero Brief">
+<meta property="og:url" content="{canonical}">
 <meta property="og:title" content="{html.escape(title, quote=True)}">
-<meta property="og:description" content="{html.escape(desc, quote=True)}">
-{FONTS}
+<meta property="og:description" content="{html.escape(desc, quote=True)}">{article_meta}
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="{html.escape(title, quote=True)}">
+<meta name="twitter:description" content="{html.escape(desc, quote=True)}">
+{jsonld}{FONTS}
 <link rel="stylesheet" href="{css_prefix}assets/brief.css">"""
+
+
+def article_jsonld(day: str, issue_no: int, desc: str, canonical: str, words: int) -> str:
+    import json
+    data = {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": f"The Platero Brief No. {issue_no}: {human_date(day)}",
+        "description": desc,
+        "datePublished": f"{day}T08:00:00-04:00",
+        "wordCount": words,
+        "url": canonical,
+        "isPartOf": {"@type": "Blog", "name": "The Platero Brief", "url": BASE},
+        "author": {"@type": "Person", "name": "Jose Platero", "url": "https://joseplatero.com"},
+        "publisher": {"@type": "Person", "name": "Jose Platero", "url": "https://joseplatero.com"},
+    }
+    return f'<script type="application/ld+json">{json.dumps(data, ensure_ascii=False)}</script>\n'
+
+
+def slot_block() -> str:
+    """Sponsor slot. If sponsor.json exists it fills the slot; otherwise the
+    house ad runs. Monetization is a config change, not a code change."""
+    import json
+    sponsor_file = SITE_ROOT / "sponsor.json"
+    if sponsor_file.exists():
+        s = json.loads(sponsor_file.read_text(encoding="utf-8"))
+        label = html.escape(s.get("label", "Presented by"))
+        text = html.escape(s.get("text", ""))
+        url = s.get("url", "")
+        name = html.escape(s.get("name", ""))
+        return (f'<div class="slot"><p class="k">{label}</p>'
+                f'<p><a href="{url}" target="_blank" rel="noopener sponsored">{name}</a>. {text}</p></div>')
+    return ('<div class="slot"><p class="k">Also by Jose</p>'
+            '<p>The weekly synthesis with my own take is '
+            '<a href="https://loopsandletters.substack.com" target="_blank" rel="noopener">Loops &amp; Letters</a>. '
+            'And if you are landing your first North American product job, I built '
+            '<a href="https://joseplatero.com/build/" target="_blank" rel="noopener">Build with Jose</a> for you.</p></div>')
 
 
 def top_bar(css_prefix: str, right: str) -> str:
@@ -248,8 +334,8 @@ def issue_page(day, briefs, issue_no, prev_day, next_day, prev_no, next_no,
 
     body = "\n".join(
         f'<section class="brief {b.css}" id="{b.css}">\n'
-        f'<div class="kick"><span class="k">{html.escape(b.name)}</span>'
-        f'<span class="wc">{b.words:,} words</span></div>\n'
+        f'<h2 class="kick"><span class="k">{html.escape(b.name)}</span>'
+        f'<span class="wc">{b.words:,} words</span></h2>\n'
         f'<div class="rule"></div>\n{b.html}\n</section>'
         for b in briefs
     )
@@ -273,10 +359,18 @@ def issue_page(day, briefs, issue_no, prev_day, next_day, prev_no, next_no,
         prevly = (f'<div class="prevly"><p class="k">Previously</p><ul>\n{rows}\n</ul>'
                   f'<a class="all" href="{css_prefix}archive/">All issues &rarr;</a></div>')
 
+    # Homepage gets the keyword title; permalinks get the issue title.
+    is_home = css_prefix == ""
+    title = ("The Platero Brief: daily AI, product, and markets intelligence"
+             if is_home else f"The Platero Brief No. {issue_no}: {human_date(day)}")
+    desc = briefs[0].excerpt if briefs else ""
+    desc = f"Issue No. {issue_no}, {human_date(day)}. {desc}"
+    jsonld = article_jsonld(day, issue_no, desc, canonical, total_words)
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
-{head_block(f"The Platero Brief, No. {issue_no}", f"The Platero Brief for {human_date(day)}. {total_words:,} words, {minutes} minute read. Executive, practitioner, AI stack, and markets intelligence.", canonical, css_prefix)}
+{head_block(title, desc, canonical, css_prefix, jsonld=jsonld, pub_date=day)}
 </head>
 <body>
 {top_bar(css_prefix, f'<span>{day}</span><a href="{css_prefix}archive/">Archive</a><a href="{BASE}feed.xml">RSS</a>')}
@@ -294,6 +388,7 @@ def issue_page(day, briefs, issue_no, prev_day, next_day, prev_no, next_no,
   </div>
 {body}
 {signoff}
+{slot_block()}
 {prevly}
   <footer class="foot">
     <div class="nav-row">
@@ -337,7 +432,7 @@ def render_archive_index(rendered):
     (ARCHIVE_DIR / "index.html").write_text(f"""<!doctype html>
 <html lang="en">
 <head>
-{head_block("The Platero Brief, Archive", "Every issue of The Platero Brief, newest first.", f"{BASE}archive/", "../")}
+{head_block("The Platero Brief Archive: every daily issue", "Every issue of The Platero Brief, newest first. Daily AI, product, and markets intelligence by Jose Platero.", f"{BASE}archive/", "../", og_type="website")}
 </head>
 <body>
 {top_bar("../", f'<a href="../">Latest issue</a><a href="{BASE}feed.xml">RSS</a>')}
@@ -387,6 +482,21 @@ def render_feed(rendered):
 </channel>
 </rss>
 """, encoding="utf-8")
+
+
+def render_sitemap(rendered):
+    """rendered: (day, no, briefs) newest first. Home, archive, every issue."""
+    latest = rendered[0][0] if rendered else ""
+    urls = [f"<url><loc>{BASE}</loc><lastmod>{latest}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>",
+            f"<url><loc>{BASE}archive/</loc><lastmod>{latest}</lastmod><changefreq>daily</changefreq><priority>0.6</priority></url>"]
+    urls += [f"<url><loc>{BASE}archive/{d}.html</loc><lastmod>{d}</lastmod><priority>0.7</priority></url>"
+             for d, _, _ in rendered]
+    (SITE_ROOT / "sitemap.xml").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        + "\n".join(urls) + "\n</urlset>\n", encoding="utf-8")
+    (SITE_ROOT / "robots.txt").write_text(
+        f"User-agent: *\nAllow: /\n\nSitemap: {BASE}sitemap.xml\n", encoding="utf-8")
 
 
 # ---------- main ----------
@@ -442,6 +552,7 @@ def main():
     newest_first = list(reversed(loaded))
     render_archive_index(newest_first)
     render_feed(newest_first)
+    render_sitemap(newest_first)
     print(f"rendered {len(loaded)} issues, latest {latest_day} (No. {latest_no})")
 
     if args.no_push:
