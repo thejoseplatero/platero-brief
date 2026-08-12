@@ -54,11 +54,16 @@ header.top {
   padding: 0 22px; height: 56px;
 }
 .wordmark {
+  display: inline-flex; align-items: center; gap: 10px;
   font-family: var(--mono); font-size: 12px; font-weight: 700;
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--ink-bright); text-decoration: none;
 }
 .wordmark:hover { color: var(--orange); }
+.wordmark .mark { display: inline-flex; border: 1.5px solid var(--ink-mute); padding: 4px; background: var(--bg-2); }
+.wordmark .mark svg { display: block; }
+.wordmark .mark rect[fill="#ff4a1c"] { transition: transform .18s ease; }
+.wordmark:hover .mark rect[fill="#ff4a1c"] { transform: translate(-6px, 6px); }
 .top-meta { display: flex; gap: 20px; align-items: baseline; }
 .top-meta span, .top-meta a {
   font-family: var(--mono); font-size: 11.5px; color: var(--ink-mute);
@@ -105,12 +110,23 @@ aside.side { display: none; }
 .side-in li.grp a { color: var(--ink-mute); }
 .side-in li.grp a.on { color: var(--ink-bright); }
 
-/* issue header */
-.issue-head { padding: 44px 0 8px; }
+/* issue header (dot-grid texture, the family pattern on dark) */
+.issue-head {
+  padding: 44px 0 8px;
+  background-image: radial-gradient(rgba(255,74,28,0.13) 1.5px, transparent 1.5px);
+  background-size: 26px 26px;
+}
 .issue-head .no {
+  display: inline-flex; align-items: center; gap: 10px;
   font-family: var(--mono); font-size: 12px; font-weight: 700;
   letter-spacing: 0.22em; text-transform: uppercase; color: var(--orange);
   margin: 0 0 10px;
+}
+.issue-head .no::before {
+  content: "";
+  width: 8px; height: 8px; background: var(--orange);
+  box-shadow: 3px 0 0 var(--orange), 0 3px 0 var(--orange), -3px 0 0 var(--orange), 0 -3px 0 var(--orange);
+  margin-right: 5px;
 }
 .issue-head h1 {
   font-family: var(--serif); font-weight: 700;
@@ -129,10 +145,11 @@ aside.side { display: none; }
   color: var(--land-t); border: 1px solid var(--land); padding: 2px 8px;
 }
 
-/* orientation block */
+/* orientation block (hard offset shadow, the family box language) */
 .toc {
   margin: 30px 0 8px; border: 1px solid var(--line);
   background: var(--bg-2); padding: 22px 24px 16px;
+  box-shadow: 6px 6px 0 rgba(255,74,28,0.22);
 }
 .toc .toc-k {
   font-family: var(--mono); font-size: 10.5px; font-weight: 700;
@@ -207,6 +224,46 @@ section.brief + section.brief { border-top: 1px solid var(--line); }
 .brief.stack a:hover { text-decoration-color: var(--stack); }
 .brief.mkts a:hover { text-decoration-color: var(--mkts); }
 .brief.land a:hover { text-decoration-color: var(--land); }
+
+/* sign-off aphorism */
+.signoff {
+  margin: 48px 0 0; padding: 26px 28px;
+  border: 1px solid var(--line); background: var(--bg-2);
+  box-shadow: 6px 6px 0 rgba(255,74,28,0.22);
+}
+.signoff .k {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--orange);
+  margin: 0 0 8px;
+}
+.signoff p.q {
+  font-family: var(--serif); font-style: italic; font-size: 21px;
+  line-height: 1.45; color: var(--ink-bright); margin: 0;
+}
+
+/* previously: recent issues on every page */
+.prevly { margin: 44px 0 0; }
+.prevly .k {
+  font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-mute);
+  margin: 0 0 6px;
+}
+.prevly ul { list-style: none; margin: 0; padding: 0; }
+.prevly li { border-bottom: 1px solid var(--line); }
+.prevly a {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
+  padding: 12px 2px; text-decoration: none;
+}
+.prevly .d { font-family: var(--serif); font-weight: 700; font-size: 16px; color: var(--ink); }
+.prevly a:hover .d { color: var(--orange); }
+.prevly .n { font-family: var(--mono); font-size: 11px; color: var(--ink-mute); letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
+.prevly .all {
+  display: inline-block; margin-top: 14px;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--orange);
+  text-decoration: none;
+}
+.prevly .all:hover { text-decoration: underline; }
 
 /* footer nav */
 footer.foot { border-top: 1px solid var(--line); margin-top: 44px; padding: 30px 0 70px; }

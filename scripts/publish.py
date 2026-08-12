@@ -55,6 +55,26 @@ FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com">\n'
          '<link href="https://fonts.googleapis.com/css2?family=Literata:ital,wght@0,400;0,700;1,400'
          '&family=Hanken+Grotesk:wght@400;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">')
 
+# The family pixel mark, dark-adapted: light pixels where BWJ uses ink.
+MARK = """<span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 11 11" shape-rendering="crispEdges">
+<g fill="#e2e0dc"><rect x="1" y="1" width="2" height="2"/><rect x="3" y="1" width="2" height="2"/><rect x="5" y="1" width="2" height="2"/><rect x="1" y="3" width="2" height="2"/><rect x="7" y="3" width="2" height="2"/><rect x="1" y="5" width="2" height="2"/><rect x="3" y="5" width="2" height="2"/><rect x="5" y="5" width="2" height="2"/><rect x="1" y="7" width="2" height="2"/><rect x="7" y="7" width="2" height="2"/></g>
+<rect x="7" y="1" width="2" height="2" fill="#ff4a1c"/></svg></span>"""
+
+# Jose's documented aphorisms (voice doc, jose-cerebro/notes/jose-tone-voice.md).
+# One closes each issue, rotating by day of year. Deterministic, no invention.
+APHORISMS = [
+    "Signal, not noise.",
+    "Slow down to go fast.",
+    "Think in decades, act in small loops.",
+    "Find the pain, not the solution.",
+    "Fear of loss moves faster than fear of gain.",
+    "Draw the line before you ship, not after.",
+    "The system is the product, not the products it produces.",
+    "Decisions and escalations: the only dashboard that matters.",
+    "Small loops to big loops.",
+    "What do I really have?",
+]
+
 
 # ---------- source handling ----------
 
@@ -192,14 +212,14 @@ def top_bar(css_prefix: str, right: str) -> str:
     return f"""<div id="progress"></div>
 <header class="top">
   <div class="top-in">
-    <a class="wordmark" href="{css_prefix if css_prefix else './'}">The Platero Brief</a>
+    <a class="wordmark" href="{css_prefix if css_prefix else './'}">{MARK}The Platero Brief</a>
     <div class="top-meta">{right}</div>
   </div>
 </header>"""
 
 
 def issue_page(day, briefs, issue_no, prev_day, next_day, prev_no, next_no,
-               css_prefix, canonical):
+               css_prefix, canonical, recent=()):
     total_words = sum(b.words for b in briefs)
     minutes = max(1, round(total_words / WPM))
     has_land = any(b.slug == "landscape-scan" for b in briefs)
@@ -239,6 +259,20 @@ def issue_page(day, briefs, issue_no, prev_day, next_day, prev_no, next_no,
     next_link = (f'<a class="next" href="{css_prefix}archive/{next_day}.html">No. {next_no} &rarr;'
                  f'<b>{human_date(next_day)}</b></a>') if next_day else ""
 
+    doy = datetime.strptime(day, "%Y-%m-%d").timetuple().tm_yday
+    aphorism = APHORISMS[doy % len(APHORISMS)]
+    signoff = (f'<div class="signoff"><p class="k">Pinned to the wall</p>'
+               f'<p class="q">{html.escape(aphorism)}</p></div>')
+
+    prevly = ""
+    if recent:
+        rows = "\n".join(
+            f'<li><a href="{css_prefix}archive/{d}.html"><span class="d">{human_date(d)}</span>'
+            f'<span class="n">No. {n} &middot; {w:,} words</span></a></li>'
+            for d, n, w in recent)
+        prevly = (f'<div class="prevly"><p class="k">Previously</p><ul>\n{rows}\n</ul>'
+                  f'<a class="all" href="{css_prefix}archive/">All issues &rarr;</a></div>')
+
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -259,6 +293,8 @@ def issue_page(day, briefs, issue_no, prev_day, next_day, prev_no, next_no,
 {toc_rows}
   </div>
 {body}
+{signoff}
+{prevly}
   <footer class="foot">
     <div class="nav-row">
       {prev_link}
@@ -384,18 +420,24 @@ def main():
     loaded = [(d, i + 1, load_day(d)) for i, d in enumerate(days)]
     loaded = [(d, n, b) for d, n, b in loaded if b]
 
+    def recent_before(idx):
+        """The 7 issues before position idx, newest first: (day, no, words)."""
+        return [(d, n, sum(b.words for b in bs))
+                for d, n, bs in reversed(loaded[max(0, idx - 7):idx])]
+
     for idx, (day, no, briefs) in enumerate(loaded):
         prev_day, prev_no = (loaded[idx - 1][0], loaded[idx - 1][1]) if idx > 0 else (None, None)
         next_day, next_no = (loaded[idx + 1][0], loaded[idx + 1][1]) if idx + 1 < len(loaded) else (None, None)
         (ARCHIVE_DIR / f"{day}.html").write_text(
             issue_page(day, briefs, no, prev_day, next_day, prev_no, next_no,
-                       "../", f"{BASE}archive/{day}.html"), encoding="utf-8")
+                       "../", f"{BASE}archive/{day}.html",
+                       recent=recent_before(idx)), encoding="utf-8")
 
     latest_day, latest_no, latest_briefs = loaded[-1]
     prev_day, prev_no = (loaded[-2][0], loaded[-2][1]) if len(loaded) > 1 else (None, None)
     (SITE_ROOT / "index.html").write_text(
         issue_page(latest_day, latest_briefs, latest_no, prev_day, None, prev_no, None,
-                   "", BASE), encoding="utf-8")
+                   "", BASE, recent=recent_before(len(loaded) - 1)), encoding="utf-8")
 
     newest_first = list(reversed(loaded))
     render_archive_index(newest_first)
